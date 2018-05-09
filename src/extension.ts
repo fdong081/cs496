@@ -15,8 +15,80 @@
 
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+//var http = require('./lib/request');
 import { window, Disposable, ExtensionContext } from 'vscode';
+//var mLab = require('mongolab-data-api')('pqn8bKvN0LmnOlf9WNYA7GR40ahMbDSW');
 
+var async = require('async');
+var Timeline = require('../models/timeline');
+var EdtiTime = require('../models/edittime');
+
+var mongoose = require('mongoose');
+var mongoDB = 'mongodb://cs496:cs496spring@ds161029.mlab.com:61029/cs496';
+
+var times: any= [];
+
+
+async function timelineCreate(_time: String, _file_name: String, _action: String) {
+  var detail = { time: _time, file_name: _file_name, action: _action };
+  var timeline = new Timeline(detail);
+  mongoose.connection.collection("timelines", timeline);
+
+  timeline.save(function (err) {
+    if (err) {
+      throw err;
+
+    }
+    console.log('New entry: ' + timeline);
+    times.push(timeline);
+  });
+}
+async function edittimeCreate(_file_name: String, _edittime: Number) {
+  var detail = { file_name: _file_name, edit_time: _edittime };
+  var edittime = new EdtiTime(detail);
+  
+  mongoose.connection.collection("edittimes", edittime);
+  edittime.save(function (err) {
+    if (err) {
+      throw err;
+
+    }
+    console.log('New entry: ' + edittime);
+    times.push(edittime);
+  });
+
+}
+/*
+function createTimeline() {
+  async.parallel([
+    function (callback) {
+      timelineCreate('Thu April 19 13:57:51 EDT 2018', 'routs.ts', 'open');
+    },
+    function (callback) {
+      timelineCreate('Thu April 19 13:57:58 EDT 2018', 'index.ts', 'open');
+    },
+    function (callback) {
+      timelineCreate('Thu April 19 13:58:10 EDT 2018', 'routs.ts', 'focus');
+    },
+    function (callback) {
+      timelineCreate('Thu April 19 13:58:13 EDT 2018', 'index.ts', 'focus');
+    },
+  ]
+  );
+}
+
+async.series([
+  createTimeline
+],
+  // Optional callback
+  function (err, results) {
+    if (err) {
+      console.log('FINAL ERR: ' + err);
+    }
+    // All done, disconnect from database
+    mongoose.connection.close();
+  });
+*/
 function composeTimeStamp(date: Date): string {
 
   let weekDayName: string = getTodayWeekDayName(date);
@@ -61,6 +133,11 @@ function concatWithDelimiter(delimiter: string, stringList: string[]): string {
 export function activate(context: ExtensionContext) {
   console.log('Congratulations, your extension is now active!');
 
+  mongoose.connect(mongoDB);
+  mongoose.Promise = global.Promise;
+
+  mongoose.connection.on('error', console.error.bind(console, 'MongoDB connection error:'));
+
   let hd = new HeaderGenerator();
   let hdCon = new HeaderController(hd);
   context.subscriptions.push(hd);
@@ -70,27 +147,35 @@ export function activate(context: ExtensionContext) {
 
 class HeaderGenerator {
   private _disposable: Disposable;
-  private fs =  require('fs');
 
-  public replaceFocusTime() {
+  public getOpenTime() {
+    // Get the current text editor 
     let editor = window.activeTextEditor;
     if (!editor) {
       return;
     }
     var doc = editor.document;
+    var time = composeTimeStamp(new Date());
+    //var opend_time: string = "Open Time: " + time;
+    var filename = doc.uri.path.substring(doc.uri.path.lastIndexOf('/') + 1);
 
-    var focus_time: string = "Focus Time: " + composeTimeStamp(new Date());
+    timelineCreate(time, filename, "open");
+
+  }
+  public getFocusTime() {
+    let editor = window.activeTextEditor;
+    if (!editor) {
+      return;
+    }
+    var doc = editor.document;
+    var time = composeTimeStamp(new Date()); 
+   // var focus_time: string = "Focus Time: " + time;
     var filename = doc.uri.path.substring(doc.uri.path.lastIndexOf('/') + 1);   
-    this.fs.appendFileSync("./output.txt", filename + " " + focus_time + "\n", (err) => {
-      if (err) {
-        return console.error(err);
-      }
-      console.log("ts file focused!");
-    });
 
-  }
-  
-  public replaceOpenTime() {
+    timelineCreate(time, filename, "focus");
+ }
+
+  public getCloseTime() {
     // Get the current text editor 
     let editor = window.activeTextEditor;
     if (!editor) {
@@ -98,38 +183,14 @@ class HeaderGenerator {
     }
 
     var doc = editor.document;
-    var opend_time: string = "Open Time: " + composeTimeStamp(new Date());
+    var time = composeTimeStamp(new Date());
+    //var opend_time: string = "Close Time: " + time;
     var filename = doc.uri.path.substring(doc.uri.path.lastIndexOf('/') + 1);
-    this.fs.appendFileSync("./output.txt", filename + " " + opend_time + "\n", (err) => {
-      if (err) {
-        return console.error(err);
-      }
-      console.log("ts file opened!");
-    });
-
-
-  }
-  public replaceCloseTime() {
-    // Get the current text editor 
-    let editor = window.activeTextEditor;
-    if (!editor) {
-      return;
-    }
-
-    var doc = editor.document;
-    var opend_time: string = "Close Time: " + composeTimeStamp(new Date());
-    var filename = doc.uri.path.substring(doc.uri.path.lastIndexOf('/') + 1);
-    this.fs.appendFileSync("./output.txt", filename + " " + opend_time + "\n", (err) => {
-      if (err) {
-        return console.error(err);
-      }
-      console.log("ts file closed!");
-    });
-
+    timelineCreate(time, filename, "close");
 
   }
   
-  public replaceSaveTime() {
+  public getSaveTime() {
     // Get the current text editor 
     let editor = window.activeTextEditor;
     if (!editor) {
@@ -138,31 +199,35 @@ class HeaderGenerator {
     // Get the document
     var edit_time: number;
     var doc = editor.document;
+    var time = composeTimeStamp(new Date());
+    //var saved_time: string = "Save Time: " + time;
+
     var filename = doc.uri.path.substring(doc.uri.path.lastIndexOf('/') + 1);
-    var saved_time: string = "Save Time: " + composeTimeStamp(new Date());
-    this.fs.appendFileSync("./output.txt", filename + " " + saved_time + "\n", (err) => {
-      if (err) {
-        return console.error(err);
-      }
-      console.log("File saved");
-    });
+    timelineCreate(time, filename, "save");
+
     edit_time = this.getEditTime(filename);
-    this.fs.appendFileSync("./output.txt", "Total Edit time for " + filename + " is " + edit_time + "\n", (err) => {
-      if (err) {
-        return console.error(err);
-      }
-      console.log("Total Caled");
-    });
+    edittimeCreate(filename, edit_time);
   }
 
 
   getEditTime(filename: string) {
-    //var lineReader = require('line-reader');
-    var this_line_copy;
-    var fs = require("fs");
     var total_time: number = 0; // 0 second
+    console.log("Data: ");
+    var textByLine = Timeline
+      .find().sort({ time: 1 })
+      .then(doc => {
+        console.log(doc);
+      })
+      .catch(err => {
+        console.error(err);
+      });
+    console.log("text"+textByLine);
+    return total_time;
+/*
+    var this_line_copy;
+    
     var text = fs.readFileSync('./output.txt', 'utf8');
-    var textByLine = text.split("\n");
+    
     textByLine.reverse();
 
     var next_line;
@@ -202,9 +267,9 @@ class HeaderGenerator {
           total_time = total_time + diff;
         }
       }
-    }
+    }*/
     ///console.log(total_time);
-    return total_time;
+   
   }
 
   formatTime(time_string: string) {
@@ -228,7 +293,7 @@ class HeaderGenerator {
 class HeaderController {
   private _hder: HeaderGenerator;
   private _disposable: Disposable;
-  
+
   constructor(hd: HeaderGenerator) {
     this._hder = hd;
     let subscriptions: Disposable[] = [];
@@ -238,23 +303,26 @@ class HeaderController {
     vscode.workspace.onDidCloseTextDocument(this._onCloseEvent, this, subscriptions);
 
     this._disposable = Disposable.from(...subscriptions);
-    //this._hder.replaceSaveTime();
-    //this._hder.replaceOpenTime();
+
   }
   dispose() {
     this._disposable.dispose();
-  }
-  private _onSaveEvent() {
-    this._hder.replaceSaveTime();
+    mongoose.connection.close();
+    console.log("connection closed ");
   }
   private _onOpenEvent() {
-    this._hder.replaceOpenTime();
+    this._hder.getOpenTime();
   }
-  private _onFocusEvent() {
-    this._hder.replaceFocusTime();
+
+  private  _onSaveEvent() {
+     this._hder.getSaveTime();
   }
-  private _onCloseEvent() {
-    this._hder.replaceCloseTime();
+
+  private  _onFocusEvent() {
+     this._hder.getFocusTime();
+  }
+  private  _onCloseEvent() {
+     this._hder.getCloseTime();
   }
 
 }
