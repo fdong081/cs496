@@ -1,0 +1,70 @@
+{
+    "name": "typescriptextension",
+    "displayName": "typescriptExtension",
+    "description": "research project ",
+    "version": "0.0.1",
+    "publisher": "None",
+    "engines": {
+        "vscode": "^1.21.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onCommand:extension.deleteKey",
+        "onCommand:extension.paste",
+        "onCommand:extension.copy",
+        "onCommand:extension.type",
+        "onCommand:default:type"
+    ],
+    "main": "./out/extension",
+    "contributes": {
+        "commands": [
+            {
+                "command": "extension.type",
+                "title": "Launcher"
+            }
+        ],
+        "keybindings": [
+            {
+                "key": "backspace",
+                "mac": "delete",
+                "command": "extension.deleteKey",
+                "when": "editorTextFocus"
+            },
+            {
+                "key": "ctrl+c",
+                "mac": "cmd+c",
+                "command": "extension.copy",
+                "when": "editorTextFocus"
+            },
+            {
+                "key": "ctrl+v",
+                "mac": "cmd+v",
+                "command": "extension.paste",
+                "when": "editorTextFocus"
+            }
+        ]
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "postinstall": "node ./node_modules/vscode/bin/install",
+        "test": "npm run compile && node ./node_modules/vscode/bin/test"
+    },
+    "devDependencies": {
+        "@types/mocha": "^2.2.42",
+        "@types/node": "^7.0.64",
+        "typescript": "^2.8.3",
+        "vscode": "^1.1.17"
+    },
+    "dependencies": {
+        "git-diff": "^2.0.6",
+        "keypress": "^0.2.1",
+        "node-keylogger": "git+https://github.com/taosx/node-keylogger.git",
+        "opn": "^4.0.2",
+        "pg": "^7.4.3",
+        "whatwg-fetch": "^2.0.4"
+    }
+}
